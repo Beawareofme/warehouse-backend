@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== Enums =====
+enum Role {
+  ADMIN
+  MERCHANT
+  WAREHOUSE_OWNER
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum HoursMode {
+  SEVEN_DAYS
+  SELECTED
+}
+
+// NOTE: Prisma enum names must start with a letter.
+// We map your “24H” concept to a legal identifier.
+enum HoursTime {
+  TWENTY_FOUR_H
+  LIMITED
+}
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+}
+
+// ===== Models =====
+model User {
+  id            Int     @id @default(autoincrement())
+  name          String
+  email         String  @unique
+  passwordHash  String
+  roles         Role[] // no default on list fields
+  contactNumber String?
+  isActive      Boolean @default(true)
+
+  warehouses       Warehouse[] @relation("OwnerWarehouses")
+  merchantBookings Booking[]   @relation("MerchantBookings")
+  logs             ActionLog[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Listing   Listing[]
+}
+
+model Warehouse {
+  id             Int      @id @default(autoincrement())
+  name           String
+  address        String?
+  city           String?
+  state          String?
+  pincode        String?
+  type           String?
+  description    String?
+  pricePerSqFt   Decimal? @db.Decimal(10, 2)
+  totalSpace     Int?
+  availableSpace Int?
+  latitude       Float?
+  longitude      Float?
+  imageUrl       String?
+  isApproved     Boolean  @default(false)
+
+  ownerId Int
+  owner   User @relation("OwnerWarehouses", fields: [ownerId], references: [id])
+
+  bookings Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city, state])
+  @@index([ownerId])
+}
+
+model Booking {
+  id            Int           @id @default(autoincrement())
+  status        BookingStatus @default(PENDING)
+  statusHistory Json?
+
+  merchantId Int
+  merchant   User @relation("MerchantBookings", fields: [merchantId], references: [id])
+
+  warehouseId Int
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([merchantId])
+  @@index([warehouseId])
+}
+
+model Listing {
+  id          Int           @id @default(autoincrement())
+  status      ListingStatus @default(DRAFT)
+  title       String?
+  description String?
+
+  // Mirrors your wizard structure (JSON blobs)
+  address        Json // { addressLine1, city, state, zip }
+  use            Json?
+  amenities      Json?
+  approvals      Json?
+  qualifications Json?
+  pricing        Json?
+  hours          Json?
+  services       Json?
+
+  ownerId Int
+  owner   User @relation(fields: [ownerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model ActionLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+  type      String // e.g. "LISTING_CREATED", "BOOKING_REQUEST"
+  message   String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+}
