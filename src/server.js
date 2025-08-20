@@ -21,6 +21,10 @@ app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.options('*', cors());
 app.use(express.json({ limit: '1mb' }));
 
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, time: new Date().toISOString() });
+});
+
 // --- Simple request logger (helps when things look "stuck") ---
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
